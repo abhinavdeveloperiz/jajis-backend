@@ -32,15 +32,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', #corseheaders
     'django.middleware.security.SecurityMiddleware',
-    'whiteNoise.middleware.WhiteNoiseMiddleware', #whitenoise
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Note the correct capitalization
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware', #corseheaders
 ]
 
 ROOT_URLCONF = 'Jajis_project.urls'
@@ -107,29 +107,13 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-import os
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# STATIC (for CSS/JS images that are part of the app)
-STATIC_URL = "/static/"
-# during development you might keep app static in each app/static
-STATICFILES_DIRS = [
-    BASE_DIR / "static",             # optional: project-level static (dev)
-]
-# where collectstatic will collect files for production
-STATIC_ROOT = BASE_DIR / "staticfiles"  # run `python manage.py collectstatic`
-
-# MEDIA (for user uploaded files)
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"    # uploaded files go here
 
 
-
-# Add these settings
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
