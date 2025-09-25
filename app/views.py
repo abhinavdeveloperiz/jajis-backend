@@ -1,8 +1,8 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerVideo
-from .serializers import BannerVideoSerializer
+from .models import BannerVideo,Saloon,Cosmetics
+from .serializers import BannerVideoSerializer,SaloonSerializer,CosmeticsSerializer
 
 @api_view(['GET'])
 def home_video_view(request):
@@ -17,7 +17,24 @@ def home_video_view(request):
 
 @api_view(['GET'])
 def salons_view(request):
-    return Response({"page": "Salons", "content": "This is the Salons page."})
+    salon = Saloon.objects.all()
+    serializer = SaloonSerializer(salon, many=True, context={'request': request})
+    return Response({
+        "page": "Salons page",
+        "data": serializer.data
+    })
+
+@api_view(['GET'])
+def salons_detail_view(request, id):
+    try:
+        salon = Saloon.objects.get(id=id)
+        serializer = SaloonSerializer(salon, context={'request': request})
+        return Response({
+            "page": "Salon Detail",
+            "data": serializer.data
+        })
+    except Saloon.DoesNotExist:
+        return Response({"error": "Salon not found"}, status=404)
 
 @api_view(['GET'])
 def cosmetics_view(request):
