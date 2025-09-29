@@ -1,8 +1,8 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerVideo,Saloon,Cosmetics
-from .serializers import BannerVideoSerializer,SaloonSerializer,CosmeticsSerializer
+from .models import BannerVideo,Saloon,Cosmetics,FoodMenu
+from .serializers import BannerVideoSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer
 
 @api_view(['GET'])
 def home_video_view(request):
@@ -23,6 +23,16 @@ def salons_view(request):
         "page": "Salons page",
         "data": serializer.data
     })
+
+def Food_menu_view(request):
+    food_items = FoodMenu.objects.all()
+    serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
+    return Response({
+        "page": "Food Menu",
+        "data": serializer.data
+    })
+
+
 
 @api_view(['GET'])
 def salons_detail_view(request, id):
@@ -46,7 +56,13 @@ def event_hall_view(request):
 
 @api_view(['GET'])
 def food_court_view(request):
-    return Response({"page": "Food Court", "content": "This is the Food Court page."})
+    food_items = FoodMenu.objects.all()
+    serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
+    return Response({
+        "page": "Food Menu",
+        "data": serializer.data
+    })
+
 
 @api_view(['GET'])
 def designing_view(request):
