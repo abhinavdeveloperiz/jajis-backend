@@ -10,6 +10,7 @@ class BannerVideo(models.Model):
 
 
 class Saloon(models.Model):
+
     name = models.CharField(max_length=200)
     description = models.TextField()
     image = models.ImageField(upload_to='saloon_images/')
@@ -25,8 +26,13 @@ class Saloon(models.Model):
     def __str__(self):
         return self.name
     
+    class Meta:
+        verbose_name = "Saloon"
+        verbose_name_plural = "Saloon"
+    
 
 class FoodMenu(models.Model):
+
     title = models.CharField(max_length=200)
     description = models.TextField()
     image = models.ImageField(upload_to='food_images/')
@@ -34,10 +40,14 @@ class FoodMenu(models.Model):
 
     def __str__(self):
         return self.title
-    
+
+    class Meta:
+        verbose_name = "Food Menu"
+        verbose_name_plural = "Food Menu"
 
     
 class Cosmetics(models.Model):
+
     title = models.CharField(max_length=200)
     description = models.TextField()
     image = models.ImageField(upload_to='cosmetics_images/')
@@ -45,3 +55,20 @@ class Cosmetics(models.Model):
 
     def __str__(self):
         return self.title
+    
+    class Meta:
+        verbose_name = "Cosmetic"
+        verbose_name_plural = "Cosmetics"
+
+
+class Courses(models.Model):
+
+    image=models.ImageField(upload_to='courses/')
+    course=models.CharField(max_length=100)
+    duration=models.CharField(max_length=100)
+    description=models.TextField()
+
+    class Meta:
+        verbose_name = "Course"
+        verbose_name_plural = "Courses"
+

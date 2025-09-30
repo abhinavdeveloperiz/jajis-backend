@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BannerVideo,Cosmetics, Saloon,FoodMenu
+from .models import BannerVideo,Cosmetics, Saloon,FoodMenu,Courses
 
 class BannerVideoSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
@@ -28,3 +28,9 @@ class CosmeticsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cosmetics
         fields = ['id', 'title', 'description', 'image', 'price']
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Courses
+        fields = "__all__"

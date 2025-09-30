@@ -20,6 +20,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    "jazzmin",  # Must be first for styling to apply correctly
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -144,3 +145,25 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://jajis-frondend.onrender.com",
 ]
+
+
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Jaji's",
+    "site_header": "Jajis Admin",
+    "site_brand": "Jaji's",
+    "welcome_sign": "Welcome to the Jaji's Admin Panel",
+    "copyright": "Jaji's © 2025",
+    "search_model": "auth.User",
+    "show_ui_builder": True,
+    "topmenu_links": [
+        {"name": "Home", "url": "/", "permissions": ["auth.view_user"]},
+        {"model": "auth.user"},
+        {"app": "myapp"},
+    ],
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "myapp": "fas fa-graduation-cap",
+    },
+    "related_modal_active": True,
+}
