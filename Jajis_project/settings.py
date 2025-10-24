@@ -144,6 +144,7 @@ CORS_ALLOW_ALL_ORIGINS = True  # Only for development!
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://jajis-frondend.onrender.com",
+    "https://inspirezesttechnologiesprojectdemo.space",
 ]
 
 

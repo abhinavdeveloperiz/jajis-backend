@@ -1,13 +1,13 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerVideo,Saloon,Cosmetics,FoodMenu,Courses
-from .serializers import BannerVideoSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer,CourseSerializer
+from .models import BannerImage,Saloon,Cosmetics,FoodMenu,Courses
+from .serializers import BannerImageSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer,CourseSerializer
 
 @api_view(['GET'])
-def home_video_view(request):
-    latest_video = BannerVideo.objects.order_by('-uploaded_at').first()
-    serializer = BannerVideoSerializer(latest_video, context={'request': request}) if latest_video else None
+def home(request):
+    latest_image = BannerImage.objects.order_by('-uploaded_at').first()
+    serializer = BannerImageSerializer(latest_image, context={'request': request}) if latest_image else None
     return Response({
         "page": "Home",
         "content": "This is the Home page.",

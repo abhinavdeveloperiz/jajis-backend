@@ -1,16 +1,11 @@
 from rest_framework import serializers
-from .models import BannerVideo,Cosmetics, Saloon,FoodMenu,Courses
+from .models import BannerImage,Cosmetics, Saloon,FoodMenu,Courses
 
-class BannerVideoSerializer(serializers.ModelSerializer):
-    video_url = serializers.SerializerMethodField()
+class BannerImageSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = BannerVideo
-        fields = ['id', 'video_url']
-
-    def get_video_url(self, obj):
-        request = self.context.get('request')
-        return request.build_absolute_uri(obj.video.url) if obj.video else None
+        model = BannerImage
+        fields = "__all__"
     
 
 class SaloonSerializer(serializers.ModelSerializer):
