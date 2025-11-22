@@ -5,8 +5,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-v9t#=pguwv4v++8b!$iz5894-id@p_$i9fmj9%_(r$wk-_g5oe'
@@ -20,7 +18,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    "jazzmin",  # Must be first for styling to apply correctly
+    "jazzmin",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -29,8 +27,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'app',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
 ]
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ]
+}
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', #corseheaders
@@ -75,6 +82,21 @@ DATABASES = {
 }
 
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'inspirez_jajis',
+#         'USER': 'inspirez_jajis',
+#         'PASSWORD': '@admin@2025',
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#     }
+# }
+
+
+
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -115,16 +137,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# STATIC files (CSS, JS, images)
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"   # where collectstatic puts files
+STATIC_URL = '/static/'
 
-# Optional: extra static dirs if you have a "static" folder inside project
+STATIC_ROOT = BASE_DIR / "staticfiles"  
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
+    BASE_DIR / "static",  
 ]
 
-# MEDIA files (uploads)
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

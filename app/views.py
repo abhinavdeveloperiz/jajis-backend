@@ -1,8 +1,10 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerImage,Saloon,Cosmetics,FoodMenu,Courses
-from .serializers import BannerImageSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer,CourseSerializer
+from .models import BannerImage,Saloon,Cosmetics,FoodMenu,Courses,Cart,CartItem,Category
+from .serializers import BannerImageSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer,CourseSerializer,CartItemSerializer,CartSerializer
+
+
 
 @api_view(['GET'])
 def home(request):
@@ -101,3 +103,141 @@ def Buy_productes_view(request):
     return Response({"page": "Buy Products", "content": "This is the Buy Products page."})
 
 
+
+
+
+
+
+# --------------------------ecommerse----------------------------
+
+from rest_framework import generics, permissions
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .serializers import (
+    SignupSerializer, LoginSerializer,ProductVariantSerializer, ProductListSerializer, CategorySerializer,ProductDetailSerializer
+)
+from .models import Category, Product, ProductVariant
+
+from rest_framework.authtoken.models import Token
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from django.contrib.auth import authenticate
+
+
+
+# ----------------------------
+# auth
+# ----------------------------
+
+class SignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = SignupSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            token = Token.objects.get(user=user)
+            return Response({
+                "message": "Signup successful",
+                "token": token.key
+            }, status=201)
+        return Response(serializer.errors, status=400)
+
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({
+                "message":"Login successful",
+                "token": token.key
+            })
+        return Response(serializer.errors, status=400)
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        request.user.auth_token.delete()   # Delete token
+        return Response({"message": "Logged out"}, status=200)
+
+
+# -----------------------------------
+
+
+
+class ProductListAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        products = Product.objects.all()
+        serializer = ProductListSerializer(products, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class ProductDetailAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk)
+            serializer = ProductDetailSerializer(product, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Product.DoesNotExist:
+            return Response({"detail": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+
+
+
+class AddToCartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        variant_id = request.data.get("variant_id")
+        quantity = int(request.data.get("quantity", 1))
+
+        try:
+            variant = ProductVariant.objects.get(id=variant_id)
+        except ProductVariant.DoesNotExist:
+            return Response({"error": "Variant not found"}, status=404)
+
+        # Check stock
+        if variant.stock < quantity:
+            return Response({"error": "Not enough stock"}, status=400)
+
+        # Get or create cart
+        cart, created = Cart.objects.get_or_create(user=request.user)
+
+        # Get or create cart item
+        cart_item, item_created = CartItem.objects.get_or_create(
+            cart=cart,
+            variant=variant,
+            defaults={'quantity': quantity}
+        )
+
+        if not item_created:
+            if variant.stock < cart_item.quantity + quantity:
+                return Response({"error": "Stock limit reached"}, status=400)
+
+            cart_item.quantity += quantity
+            cart_item.save()
+
+        return Response({"message": "Added to cart successfully"}, status=200)
+    
+
+class CartDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        serializer = CartSerializer(cart)
+        return Response(serializer.data)
+
+        
+        

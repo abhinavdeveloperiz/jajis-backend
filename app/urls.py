@@ -13,4 +13,21 @@ urlpatterns = [
     path('franchise/', views.franchise_view),
     path('about-us/', views.about_us_view),
     path('contact/', views.contact_view),
+
+
+    # ecom-----------------
+
+    path("signup/", views.SignupView.as_view(), name="signup"),
+    path("login/", views.LoginView.as_view(), name="login"),
+    path("logout/", views.LogoutView.as_view(), name="logout"),
+
+    path("products/", views.ProductListAPIView.as_view(), name="product-list"),
+    path('products/<int:pk>/', views.ProductDetailAPIView.as_view(), name='product-detail'),
+
+    path('cart/add/', views.AddToCartView.as_view(), name='add_to_cart'),
+    path('cart/', views.CartDetailView.as_view(), name='cart_detail'),
+
+
+
+  
 ]
