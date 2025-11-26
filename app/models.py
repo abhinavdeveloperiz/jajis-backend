@@ -142,3 +142,7 @@ class CartItem(models.Model):
 
     def __str__(self):
         return f"{self.variant} x {self.quantity}"
+
+    @property
+    def total_price(self):
+        return self.quantity * self.variant.price

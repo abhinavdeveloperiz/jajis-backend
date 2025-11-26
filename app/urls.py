@@ -21,12 +21,15 @@ urlpatterns = [
     path("login/", views.LoginView.as_view(), name="login"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
 
+
     path("products/", views.ProductListAPIView.as_view(), name="product-list"),
     path('products/<int:pk>/', views.ProductDetailAPIView.as_view(), name='product-detail'),
 
+
     path('cart/add/', views.AddToCartView.as_view(), name='add_to_cart'),
     path('cart/', views.CartDetailView.as_view(), name='cart_detail'),
-
+    path('cart/update/', views.UpdateCartQuantityView.as_view(), name='update_cart_quantity'),
+    path('cart/remove/', views.RemoveCartItemView.as_view(), name='remove_cart_item'),
 
 
   

@@ -207,14 +207,10 @@ class AddToCartView(APIView):
         except ProductVariant.DoesNotExist:
             return Response({"error": "Variant not found"}, status=404)
 
-        # Check stock
         if variant.stock < quantity:
             return Response({"error": "Not enough stock"}, status=400)
 
-        # Get or create cart
         cart, created = Cart.objects.get_or_create(user=request.user)
-
-        # Get or create cart item
         cart_item, item_created = CartItem.objects.get_or_create(
             cart=cart,
             variant=variant,
@@ -222,14 +218,42 @@ class AddToCartView(APIView):
         )
 
         if not item_created:
-            if variant.stock < cart_item.quantity + quantity:
+            if cart_item.quantity + quantity > variant.stock:
                 return Response({"error": "Stock limit reached"}, status=400)
 
             cart_item.quantity += quantity
             cart_item.save()
 
         return Response({"message": "Added to cart successfully"}, status=200)
-    
+
+
+
+class UpdateCartQuantityView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        item_id = request.data.get("item_id")
+        quantity = int(request.data.get("quantity"))
+
+        try:
+            cart_item = CartItem.objects.get(id=item_id, cart__user=request.user)
+        except CartItem.DoesNotExist:
+            return Response({"error": "Cart item not found"}, status=404)
+
+        if quantity < 1:
+            cart_item.delete()
+            return Response({"message": "Item removed from cart"}, status=200)
+
+        if quantity > cart_item.variant.stock:
+            return Response({"error": "Stock limit exceeded"}, status=400)
+
+        cart_item.quantity = quantity
+        cart_item.save()
+
+        return Response({"message": "Quantity updated successfully"}, status=200)
+
+
+
 
 class CartDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -238,6 +262,21 @@ class CartDetailView(APIView):
         cart, created = Cart.objects.get_or_create(user=request.user)
         serializer = CartSerializer(cart)
         return Response(serializer.data)
+
+
+class RemoveCartItemView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        item_id = request.data.get("item_id")
+
+        try:
+            cart_item = CartItem.objects.get(id=item_id, cart__user=request.user)
+            cart_item.delete()
+            return Response({"message": "Item removed"}, status=200)
+        except CartItem.DoesNotExist:
+            return Response({"error": "Item not found"}, status=404)
+
 
         
         

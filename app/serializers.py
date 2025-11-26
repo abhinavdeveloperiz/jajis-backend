@@ -139,15 +139,24 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 class CartItemSerializer(serializers.ModelSerializer):
     variant_name = serializers.CharField(source='variant.quantity_label', read_only=True)
     price = serializers.DecimalField(source='variant.price', max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
-        fields = ['id', 'variant', 'variant_name', 'quantity', 'price']
+        fields = ['id', 'variant', 'variant_name', 'quantity', 'price', 'total_price']
+
+    def get_total_price(self, obj):
+        return obj.total_price
+
 
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
+    cart_total = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
-        fields = ['id', 'items']
+        fields = ['id', 'items', 'cart_total']
+
+    def get_cart_total(self, obj):
+        return sum(item.total_price for item in obj.items.all())
