@@ -32,5 +32,14 @@ urlpatterns = [
     path('cart/remove/', views.RemoveCartItemView.as_view(), name='remove_cart_item'),
 
 
+    # ---------------- Wishlist -----------------
+
+
+    path('wishlist/', views.WishlistDetailView.as_view(), name='wishlist_detail'),
+    path('wishlist/add/', views.AddToWishlistView.as_view(), name='add_to_wishlist'),
+    path('wishlist/remove/', views.RemoveFromWishlistView.as_view(), name='remove_from_wishlist'),
+    path('wishlist/toggle/', views.ToggleWishlistView.as_view(), name='toggle_wishlist'),
+
+
   
 ]

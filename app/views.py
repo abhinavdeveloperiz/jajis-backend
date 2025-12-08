@@ -113,9 +113,9 @@ def Buy_productes_view(request):
 from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import (
-    SignupSerializer, LoginSerializer,ProductVariantSerializer, ProductListSerializer, CategorySerializer,ProductDetailSerializer
+    SignupSerializer, LoginSerializer,ProductVariantSerializer, ProductListSerializer, CategorySerializer,ProductDetailSerializer,WishlistSerializer,WishlistItemSerializer
 )
-from .models import Category, Product, ProductVariant
+from .models import Category, Product, ProductVariant,WishlistItem,Wishlist
 
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
@@ -172,12 +172,26 @@ class LogoutView(APIView):
 
 
 class ProductListAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request):
+        category_name = request.GET.get("category")
+
         products = Product.objects.all()
+
+        if category_name and category_name.lower() != "all":
+            products = products.filter(category__name__icontains=category_name)
+
         serializer = ProductListSerializer(products, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        categories = Category.objects.all()
+        category_serializer = CategorySerializer(categories, many=True)
+
+        return Response({
+            "products": serializer.data,
+            "categories": category_serializer.data
+        }, status=status.HTTP_200_OK)
+
 
 
 
@@ -255,14 +269,23 @@ class UpdateCartQuantityView(APIView):
 
 
 
+# class CartDetailView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         cart, created = Cart.objects.get_or_create(user=request.user)
+#         serializer = CartSerializer(cart)
+#         return Response(serializer.data)
+
 class CartDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         cart, created = Cart.objects.get_or_create(user=request.user)
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
+        
 
 class RemoveCartItemView(APIView):
     permission_classes = [IsAuthenticated]
@@ -278,5 +301,79 @@ class RemoveCartItemView(APIView):
             return Response({"error": "Item not found"}, status=404)
 
 
-        
-        
+
+
+
+def get_user_wishlist(user):
+    wishlist, created = Wishlist.objects.get_or_create(user=user)
+    return wishlist
+
+class WishlistDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        wishlist = get_user_wishlist(request.user)
+        serializer = WishlistSerializer(wishlist, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AddToWishlistView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        variant_id = request.data.get("variant_id")
+        if not variant_id:
+            return Response({"error": "variant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            variant = ProductVariant.objects.get(id=variant_id)
+        except ProductVariant.DoesNotExist:
+            return Response({"error": "Variant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        wishlist = get_user_wishlist(request.user)
+
+        item, created = WishlistItem.objects.get_or_create(wishlist=wishlist, variant=variant)
+        if not created:
+            return Response({"message": "Already in wishlist"}, status=status.HTTP_200_OK)
+
+        return Response({"message": "Added to wishlist"}, status=status.HTTP_201_CREATED)
+
+
+class RemoveFromWishlistView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        variant_id = request.data.get("variant_id")
+        if not variant_id:
+            return Response({"error": "variant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            item = WishlistItem.objects.get(wishlist__user=request.user, variant__id=variant_id)
+            item.delete()
+            return Response({"message": "Removed from wishlist"}, status=status.HTTP_200_OK)
+        except WishlistItem.DoesNotExist:
+            return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ToggleWishlistView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        variant_id = request.data.get("variant_id")
+        if not variant_id:
+            return Response({"error": "variant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            variant = ProductVariant.objects.get(id=variant_id)
+        except ProductVariant.DoesNotExist:
+            return Response({"error": "Variant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        wishlist = get_user_wishlist(request.user)
+
+        exists = WishlistItem.objects.filter(wishlist=wishlist, variant=variant).first()
+        if exists:
+            exists.delete()
+            return Response({"toggled": False, "message": "Removed from wishlist"}, status=status.HTTP_200_OK)
+
+        WishlistItem.objects.create(wishlist=wishlist, variant=variant)
+        return Response({"toggled": True, "message": "Added to wishlist"}, status=status.HTTP_201_CREATED)

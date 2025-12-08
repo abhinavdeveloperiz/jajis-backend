@@ -146,3 +146,26 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.quantity * self.variant.price
+
+
+
+
+
+class Wishlist(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="wishlist")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Wishlist"
+
+
+
+class WishlistItem(models.Model):
+    wishlist = models.ForeignKey(Wishlist, on_delete=models.CASCADE, related_name="wishlist_items")
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('wishlist', 'variant')
+
+    def __str__(self):
+        return f"{self.variant.product.title} - {self.variant.quantity_label}"
