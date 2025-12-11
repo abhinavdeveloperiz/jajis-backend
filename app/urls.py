@@ -39,7 +39,22 @@ urlpatterns = [
     path('wishlist/add/', views.AddToWishlistView.as_view(), name='add_to_wishlist'),
     path('wishlist/remove/', views.RemoveFromWishlistView.as_view(), name='remove_from_wishlist'),
     path('wishlist/toggle/', views.ToggleWishlistView.as_view(), name='toggle_wishlist'),
+ 
+
+    # Address
+    path('addresses/', views.AddressListCreateView.as_view(), name='addresses'),
+    path('addresses/<int:pk>/', views.AddressDetailView.as_view(), name='address_detail'),
 
 
-  
+    # Payment / Order Creation + Verification
+    path("payment/create/", views.CreatePaymentOrderView.as_view(), name="create_payment"),
+    path("payment/verify/", views.VerifyPaymentView.as_view(), name="verify_payment"),
+
+    # Orders
+    path("orders/", views.OrderListView.as_view(), name="orders"),
+    path("orders/<int:pk>/", views.OrderDetailView.as_view(), name="order_detail"),
+
+
+    
+
 ]

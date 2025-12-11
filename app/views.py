@@ -1,8 +1,33 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerImage,Saloon,Cosmetics,FoodMenu,Courses,Cart,CartItem,Category
-from .serializers import BannerImageSerializer,SaloonSerializer,CosmeticsSerializer,FoodMenuSerializer,CourseSerializer,CartItemSerializer,CartSerializer
+from .models import BannerImage,Saloon,FoodMenu,Courses,Cart,CartItem,Category,Product,ProductVariant,Wishlist,WishlistItem
+from .serializers import BannerImageSerializer,SaloonSerializer,FoodMenuSerializer,CourseSerializer,CartItemSerializer,CartSerializer
+
+from rest_framework import permissions
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .serializers import (
+    SignupSerializer,
+    LoginSerializer,
+    ProductListSerializer,
+    CategorySerializer,
+    ProductDetailSerializer,
+    WishlistSerializer,
+    AddressSerializer,
+    OrderItemSerializer,
+    OrderListSerializer,
+    OrderSerializer,
+)
+from .models import Category, Product, ProductVariant,WishlistItem,Wishlist,Order,OrderItem,PaymentTransaction,Address
+
+from rest_framework.authtoken.models import Token
+from rest_framework.views import APIView
+from rest_framework import status
+from django.db import transaction
+from django.conf import settings
+import razorpay
+from django.shortcuts import get_object_or_404
+
 
 
 
@@ -26,6 +51,8 @@ def salons_view(request):
         "data": serializer.data
     })
 
+
+@api_view(['GET'])
 def Food_menu_view(request):
     food_items = FoodMenu.objects.all()
     serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
@@ -110,24 +137,11 @@ def Buy_productes_view(request):
 
 # --------------------------ecommerse----------------------------
 
-from rest_framework import generics, permissions
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from .serializers import (
-    SignupSerializer, LoginSerializer,ProductVariantSerializer, ProductListSerializer, CategorySerializer,ProductDetailSerializer,WishlistSerializer,WishlistItemSerializer
-)
-from .models import Category, Product, ProductVariant,WishlistItem,Wishlist
-
-from rest_framework.authtoken.models import Token
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework import status
-from django.contrib.auth import authenticate
 
 
 
-# ----------------------------
-# auth
-# ----------------------------
+
+
 
 class SignupView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -172,18 +186,15 @@ class LogoutView(APIView):
 
 
 class ProductListAPIView(APIView):
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [AllowAny]  # changed from IsAuthenticated
 
     def get(self, request):
         category_name = request.GET.get("category")
-
         products = Product.objects.all()
-
         if category_name and category_name.lower() != "all":
             products = products.filter(category__name__icontains=category_name)
 
         serializer = ProductListSerializer(products, many=True, context={'request': request})
-
         categories = Category.objects.all()
         category_serializer = CategorySerializer(categories, many=True)
 
@@ -377,3 +388,243 @@ class ToggleWishlistView(APIView):
 
         WishlistItem.objects.create(wishlist=wishlist, variant=variant)
         return Response({"toggled": True, "message": "Added to wishlist"}, status=status.HTTP_201_CREATED)
+
+
+# ---------------- Address -----------------
+
+class AddressListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        addresses = Address.objects.filter(user=request.user).order_by("-is_default", "-created_at")
+        serializer = AddressSerializer(addresses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = AddressSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if serializer.validated_data.get("is_default"):
+            Address.objects.filter(user=request.user, is_default=True).update(is_default=False)
+
+        address = serializer.save(user=request.user)
+        return Response(AddressSerializer(address).data, status=status.HTTP_201_CREATED)
+
+
+class AddressDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk, user):
+        return get_object_or_404(Address, pk=pk, user=user)
+
+    def get(self, request, pk):
+        address = self.get_object(pk, request.user)
+        return Response(AddressSerializer(address).data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        address = self.get_object(pk, request.user)
+        serializer = AddressSerializer(address, data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if serializer.validated_data.get("is_default"):
+            Address.objects.filter(user=request.user, is_default=True).exclude(pk=pk).update(is_default=False)
+
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        address = self.get_object(pk, request.user)
+        serializer = AddressSerializer(address, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if serializer.validated_data.get("is_default"):
+            Address.objects.filter(user=request.user, is_default=True).exclude(pk=pk).update(is_default=False)
+
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        address = self.get_object(pk, request.user)
+        address.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CreatePaymentOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        shipping_address_id = request.data.get("shipping_address_id")
+        billing_address_id = request.data.get("billing_address_id")
+
+        # Validate addresses
+        try:
+            shipping_address = Address.objects.get(id=shipping_address_id, user=request.user)
+        except Address.DoesNotExist:
+            return Response({"error": "Invalid shipping address"}, status=400)
+
+        if billing_address_id:
+            try:
+                billing_address = Address.objects.get(id=billing_address_id, user=request.user)
+            except Address.DoesNotExist:
+                return Response({"error": "Invalid billing address"}, status=400)
+        else:
+            billing_address = shipping_address  # fallback
+
+        # Get cart
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        items = cart.items.select_related("variant", "variant__product")
+
+        if not items:
+            return Response({"error": "Cart is empty"}, status=400)
+
+        total_amount = sum(item.total_price for item in items)
+        razorpay_amount = int(total_amount * 100)
+
+        # Create Razorpay order
+        try:
+            client = razorpay.Client(
+                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            )
+            razorpay_order = client.order.create({
+                "amount": razorpay_amount,
+                "currency": "INR",
+                "payment_capture": 1,
+            })
+        except Exception as exc:  # pragma: no cover - network error handling
+            return Response({"error": f"Failed to create payment order: {exc}"}, status=400)
+
+        # Save transaction temporarily (clear any previous pending ones)
+        PaymentTransaction.objects.filter(user=request.user, status="created").delete()
+        PaymentTransaction.objects.create(
+            user=request.user,
+            amount=total_amount,
+            razorpay_order_id=razorpay_order["id"],
+            status="created",
+            shipping_address_id=shipping_address.id,
+            billing_address_id=billing_address.id,
+        )
+
+        return Response({
+            "order_id": razorpay_order["id"],
+            "amount": total_amount,
+            "currency": "INR",
+            "key": settings.RAZORPAY_KEY_ID,
+        }, status=200)
+
+
+
+
+
+class VerifyPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        razorpay_order_id = request.data.get("razorpay_order_id")
+        razorpay_payment_id = request.data.get("razorpay_payment_id")
+        razorpay_signature = request.data.get("razorpay_signature")
+
+        if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+            return Response({"error": "Missing payment information"}, status=400)
+
+        try:
+            tx = PaymentTransaction.objects.get(
+                razorpay_order_id=razorpay_order_id,
+                user=request.user,
+            )
+        except PaymentTransaction.DoesNotExist:
+            return Response({"error": "Transaction not found"}, status=404)
+
+        if tx.status != "created":
+            return Response({"error": "Transaction already processed"}, status=400)
+
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+        # Signature verify
+        try:
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature,
+            })
+        except:
+            tx.status = "failed"
+            tx.save()
+            return Response({"error": "Payment verification failed"}, status=400)
+
+        # Fetch addresses with user guard
+        try:
+            shipping_address = Address.objects.get(id=tx.shipping_address_id, user=request.user)
+            billing_address = Address.objects.get(id=tx.billing_address_id, user=request.user)
+        except Address.DoesNotExist:
+            tx.status = "failed"
+            tx.save(update_fields=["status"])
+            return Response({"error": "Saved address not found"}, status=400)
+
+        # Create final Order
+        order = Order.objects.create(
+            user=request.user,
+            shipping_address=shipping_address,
+            billing_address=billing_address,
+            total_amount=tx.amount,
+            status="processing",
+            payment_method="razorpay",
+            payment_status="paid",
+            transaction_id=razorpay_payment_id,
+        )
+
+        # Convert cart items into OrderItems
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        items = cart.items.select_related("variant", "variant__product")
+
+        for item in items:
+            OrderItem.objects.create(
+                order=order,
+                variant=item.variant,
+                quantity=item.quantity,
+                unit_price=item.variant.price,
+                total_price=item.total_price,
+            )
+            item.variant.stock = max(0, item.variant.stock - item.quantity)
+            item.variant.save(update_fields=["stock"])
+
+        # Clear cart
+        items.delete()
+
+        # Update payment transaction
+        tx.order = order
+        tx.razorpay_payment_id = razorpay_payment_id
+        tx.razorpay_signature = razorpay_signature
+        tx.status = "success"
+        tx.save()
+
+        return Response({
+            "message": "Payment verified successfully",
+            "order_id": order.id
+        }, status=200)
+
+
+# ---------------- Orders -----------------
+
+class OrderListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = Order.objects.filter(user=request.user).order_by("-created_at")
+        serializer = OrderListSerializer(orders, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class OrderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        order = get_object_or_404(Order, pk=pk, user=request.user)
+        serializer = OrderSerializer(order, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+

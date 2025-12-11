@@ -1,28 +1,36 @@
 from rest_framework import serializers
-from .models import BannerImage,Cosmetics, Saloon,FoodMenu,Courses,Product, ProductVariant,Category,Cart,CartItem,Wishlist,WishlistItem
-from django.contrib.auth import get_user_model
+from .models import (
+    BannerImage, Cosmetics, Saloon, FoodMenu, Courses,
+    Product, ProductVariant, Category, Cart, CartItem,
+    Wishlist, WishlistItem, Address, Order, OrderItem,
+    
+)
+from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
 
+
+# --------------------------------------------------------------
+# BASIC MODELS
+# --------------------------------------------------------------
 
 class BannerImageSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = BannerImage
         fields = "__all__"
-    
+
 
 class SaloonSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Saloon
-        fields = "__all__" 
+        fields = "__all__"
+
 
 class FoodMenuSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodMenu
         fields = ['id', 'title', 'description', 'image', 'price']
+
 
 class CosmeticsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,11 +44,9 @@ class CourseSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-
-# -----------------------e commerse------------------------------
-
-
-
+# --------------------------------------------------------------
+# AUTH SERIALIZERS
+# --------------------------------------------------------------
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -49,13 +55,23 @@ class SignupSerializer(serializers.ModelSerializer):
         model = User
         fields = ["username", "email", "password"]
 
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already exists")
+        return value
+
+    def validate_email(self, value):
+        if value and User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists")
+        return value
+
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data["username"],
-            email=validated_data["email"],
+            email=validated_data.get("email"),
             password=validated_data["password"]
         )
-        Token.objects.create(user=user)
+        Token.objects.get_or_create(user=user)
         return user
 
 
@@ -64,15 +80,16 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(
-            username=data.get("username"),
-            password=data.get("password")
-        )
+        user = authenticate(username=data.get("username"), password=data.get("password"))
         if not user:
             raise serializers.ValidationError("Invalid username or password")
         data["user"] = user
         return data
 
+
+# --------------------------------------------------------------
+# PRODUCT / VARIANT / CATEGORY
+# --------------------------------------------------------------
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -81,13 +98,21 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductInCartSerializer(serializers.ModelSerializer):
+    image1 = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = ['id', 'title', 'brand', 'image1']
 
+    def get_image1(self, obj):
+        request = self.context.get('request')
+        if obj.image1:
+            return request.build_absolute_uri(obj.image1.url) if request else obj.image1.url
+        return None
+
 
 class ProductVariantSerializer(serializers.ModelSerializer):
-    product = ProductInCartSerializer(read_only=True) 
+    product = ProductInCartSerializer(read_only=True)
 
     class Meta:
         model = ProductVariant
@@ -102,13 +127,14 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         ]
 
 
-
-
 class ProductListSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
-    
-  
+    image1 = serializers.SerializerMethodField()
+    image2 = serializers.SerializerMethodField()
+    image3 = serializers.SerializerMethodField()
+    image4 = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
@@ -123,11 +149,19 @@ class ProductListSerializer(serializers.ModelSerializer):
             "variants",
         ]
 
+    def _abs(self, img):
+        request = self.context.get('request')
+        return request.build_absolute_uri(img.url) if (img and request) else (img.url if img else None)
+
+    def get_image1(self, obj): return self._abs(obj.image1)
+    def get_image2(self, obj): return self._abs(obj.image2)
+    def get_image3(self, obj): return self._abs(obj.image3)
+    def get_image4(self, obj): return self._abs(obj.image4)
+
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
-    
 
     class Meta:
         model = Product
@@ -144,25 +178,10 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "variants",
         ]
 
- 
 
-
-# class CartItemSerializer(serializers.ModelSerializer):
-#     variant = ProductVariantSerializer(read_only=True)
-#     total_price = serializers.SerializerMethodField()
-
-#     # Direct fields for easier React use
-#     product_title = serializers.CharField(source='variant.product.title', read_only=True)
-#     product_brand = serializers.CharField(source='variant.product.brand', read_only=True)
-#     product_image = serializers.ImageField(source='variant.product.image1', read_only=True)
-
-#     class Meta:
-#         model = CartItem
-#         fields = ['id', 'variant', 'product_title', 'product_brand', 'product_image', 'quantity', 'total_price']
-
-#     def get_total_price(self, obj):
-#         return obj.total_price
-
+# --------------------------------------------------------------
+# CART
+# --------------------------------------------------------------
 
 class CartItemSerializer(serializers.ModelSerializer):
     variant = ProductVariantSerializer(read_only=True)
@@ -177,18 +196,11 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     def get_total_price(self, obj):
         return obj.total_price
-    
+
     def get_product_image(self, obj):
         request = self.context.get('request')
-        if obj.variant.product.image1:
-            if request:
-                return request.build_absolute_uri(obj.variant.product.image1.url)
-            else:
-                # Fallback if no request in context
-                return obj.variant.product.image1.url
-        return None
-
-
+        img = obj.variant.product.image1
+        return request.build_absolute_uri(img.url) if (img and request) else (img.url if img else None)
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -203,23 +215,24 @@ class CartSerializer(serializers.ModelSerializer):
         return sum(item.total_price for item in obj.items.all())
 
 
+# --------------------------------------------------------------
+# WISHLIST
+# --------------------------------------------------------------
+
 class WishlistItemSerializer(serializers.ModelSerializer):
     variant = ProductVariantSerializer(read_only=True)
-
-   
     product_title = serializers.CharField(source='variant.product.title', read_only=True)
     product_brand = serializers.CharField(source='variant.product.brand', read_only=True)
-    product_image = serializers.ImageField(source='variant.product.image1', read_only=True)
+    product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = WishlistItem
-        fields = [
-            "id",
-            "variant",
-            "product_title",
-            "product_brand",
-            "product_image",
-        ]
+        fields = ["id", "variant", "product_title", "product_brand", "product_image"]
+
+    def get_product_image(self, obj):
+        request = self.context.get('request')
+        img = obj.variant.product.image1
+        return request.build_absolute_uri(img.url) if (img and request) else (img.url if img else None)
 
 
 class WishlistSerializer(serializers.ModelSerializer):
@@ -228,3 +241,119 @@ class WishlistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wishlist
         fields = ['id', 'items']
+
+
+
+
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            "id",
+            "label",
+            "line1",
+            "line2",
+            "city",
+            "state",
+            "postal_code",
+            "country",
+            "phone",
+            "is_default",
+        ]
+
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    variant = ProductVariantSerializer(read_only=True)
+    product_title = serializers.CharField(source="variant.product.title", read_only=True)
+    product_brand = serializers.CharField(source="variant.product.brand", read_only=True)
+    product_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = [
+            "id",
+            "variant",
+            "product_title",
+            "product_brand",
+            "product_image",
+            "quantity",
+            "unit_price",
+            "total_price",
+        ]
+
+    def get_product_image(self, obj):
+        request = self.context.get("request")
+        img = obj.variant.product.image1
+
+        if img:
+            return request.build_absolute_uri(img.url) if request else img.url
+
+        return None
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+    shipping_address = AddressSerializer(read_only=True)
+    billing_address = AddressSerializer(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "user",
+            "shipping_address",
+            "billing_address",
+            "total_amount",
+            "shipping_cost",
+            "status",
+            "payment_method",
+            "payment_status",
+            "transaction_id",
+            "created_at",
+            "updated_at",
+            "items",
+        ]
+        read_only_fields = ["user", "created_at", "updated_at"]
+
+
+
+
+class OrderListSerializer(serializers.ModelSerializer):
+    first_product_image = serializers.SerializerMethodField()
+    first_product_title = serializers.SerializerMethodField()
+    items_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "total_amount",
+            "status",
+            "payment_status",
+            "created_at",
+            "first_product_image",
+            "first_product_title",
+            "items_count",
+        ]
+
+    def get_first_product_image(self, obj):
+        request = self.context.get("request")
+        first_item = obj.items.first()
+
+        if first_item and first_item.variant.product.image1:
+            img = first_item.variant.product.image1
+            return request.build_absolute_uri(img.url) if request else img.url
+
+        return None
+
+    def get_first_product_title(self, obj):
+        first_item = obj.items.first()
+        return first_item.variant.product.title if first_item else None
+
+    def get_items_count(self, obj):
+        return obj.items.count()
+
+

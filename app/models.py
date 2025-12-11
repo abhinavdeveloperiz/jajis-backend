@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db import transaction
 
 
 class BannerImage(models.Model):
@@ -169,3 +170,81 @@ class WishlistItem(models.Model):
 
     def __str__(self):
         return f"{self.variant.product.title} - {self.variant.quantity_label}"
+
+
+
+class Address(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
+    label = models.CharField(max_length=100, blank=True, null=True)  # e.g. Home, Work
+    line1 = models.CharField(max_length=255)
+    line2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20)
+    country = models.CharField(max_length=100, default="India")
+    phone = models.CharField(max_length=30, blank=True, null=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.label or self.line1}"
+
+
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("confirmed", "Confirmed"),
+        ("processing", "Processing"),
+        ("shipped", "Shipped"),
+        ("delivered", "Delivered"),
+        ("cancelled", "Cancelled"),
+        ("refunded", "Refunded"),
+        ("failed", "Failed"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
+    shipping_address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, related_name="+")
+    billing_address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, related_name="+")
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_cost = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+
+    payment_method = models.CharField(max_length=100, blank=True, null=True)
+    payment_status = models.CharField(max_length=50, default="unpaid")
+
+    transaction_id = models.CharField(max_length=255, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Order #{self.id} - {self.user.username}"
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"Order {self.order.id} - {self.variant}"
+
+
+class PaymentTransaction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    razorpay_order_id = models.CharField(max_length=200)
+    razorpay_payment_id = models.CharField(max_length=200, null=True, blank=True)
+    razorpay_signature = models.CharField(max_length=255, null=True, blank=True)
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, default="created")
+
+    shipping_address_id = models.IntegerField(null=True, blank=True)
+    billing_address_id = models.IntegerField(null=True, blank=True)
+
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)

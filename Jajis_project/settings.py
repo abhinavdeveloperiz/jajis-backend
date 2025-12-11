@@ -12,7 +12,12 @@ SECRET_KEY = 'django-insecure-v9t#=pguwv4v++8b!$iz5894-id@p_$i9fmj9%_(r$wk-_g5oe
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'inspirezesttechnologiesprojectdemo.space', 
+    'www.inspirezesttechnologiesprojectdemo.space',
+    '127.0.0.1', 
+    'localhost',  
+]
 
 
 # Application definition
@@ -168,6 +173,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 
 JAZZMIN_SETTINGS = {
     "site_title": "Jaji's",
@@ -188,3 +195,14 @@ JAZZMIN_SETTINGS = {
     },
     "related_modal_active": True,
 }
+
+
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Razorpay Configuration
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
