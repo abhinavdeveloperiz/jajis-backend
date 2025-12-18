@@ -10,9 +10,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-v9t#=pguwv4v++8b!$iz5894-id@p_$i9fmj9%_(r$wk-_g5oe'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = tr
 
 ALLOWED_HOSTS = [
+    'jajis-frondend.onrender.com',
+    'www.jajis-frondend.onrender.com',
     'inspirezesttechnologiesprojectdemo.space', 
     'www.inspirezesttechnologiesprojectdemo.space',
     '127.0.0.1', 
