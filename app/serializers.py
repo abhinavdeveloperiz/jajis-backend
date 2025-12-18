@@ -3,6 +3,7 @@ from .models import (
     BannerImage, Cosmetics, Saloon, FoodMenu, Courses,
     Product, ProductVariant, Category, Cart, CartItem,
     Wishlist, WishlistItem, Address, Order, OrderItem,
+    PaymentTransaction,
     
 )
 from django.contrib.auth.models import User
@@ -15,33 +16,77 @@ from django.contrib.auth import authenticate
 # --------------------------------------------------------------
 
 class BannerImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = BannerImage
         fields = "__all__"
 
+    def get_image(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if (obj.image and request) else (obj.image.url if obj.image else None)
+
 
 class SaloonSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    image1 = serializers.SerializerMethodField()
+    image2 = serializers.SerializerMethodField()
+    image3 = serializers.SerializerMethodField()
+    image4 = serializers.SerializerMethodField()
+    image5 = serializers.SerializerMethodField()
+    image6 = serializers.SerializerMethodField()
+
     class Meta:
         model = Saloon
         fields = "__all__"
 
+    def _abs(self, img):
+        request = self.context.get("request")
+        return request.build_absolute_uri(img.url) if (img and request) else (img.url if img else None)
+
+    def get_image(self, obj): return self._abs(obj.image)
+    def get_image1(self, obj): return self._abs(obj.image1)
+    def get_image2(self, obj): return self._abs(obj.image2)
+    def get_image3(self, obj): return self._abs(obj.image3)
+    def get_image4(self, obj): return self._abs(obj.image4)
+    def get_image5(self, obj): return self._abs(obj.image5)
+    def get_image6(self, obj): return self._abs(obj.image6)
+
 
 class FoodMenuSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = FoodMenu
         fields = ['id', 'title', 'description', 'image', 'price']
 
+    def get_image(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if (obj.image and request) else (obj.image.url if obj.image else None)
+
 
 class CosmeticsSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Cosmetics
         fields = ['id', 'title', 'description', 'image', 'price']
 
+    def get_image(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if (obj.image and request) else (obj.image.url if obj.image else None)
+
 
 class CourseSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Courses
         fields = "__all__"
+
+    def get_image(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if (obj.image and request) else (obj.image.url if obj.image else None)
 
 
 # --------------------------------------------------------------
@@ -129,6 +174,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     image1 = serializers.SerializerMethodField()
     image2 = serializers.SerializerMethodField()
@@ -146,6 +192,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "image3",
             "image4",
             "category",
+            "category_name",
             "variants",
         ]
 
@@ -162,6 +209,10 @@ class ProductListSerializer(serializers.ModelSerializer):
 class ProductDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
+    image1 = serializers.SerializerMethodField()
+    image2 = serializers.SerializerMethodField()
+    image3 = serializers.SerializerMethodField()
+    image4 = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -177,6 +228,15 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "category",
             "variants",
         ]
+
+    def _abs(self, img):
+        request = self.context.get("request")
+        return request.build_absolute_uri(img.url) if (img and request) else (img.url if img else None)
+
+    def get_image1(self, obj): return self._abs(obj.image1)
+    def get_image2(self, obj): return self._abs(obj.image2)
+    def get_image3(self, obj): return self._abs(obj.image3)
+    def get_image4(self, obj): return self._abs(obj.image4)
 
 
 # --------------------------------------------------------------
@@ -298,6 +358,8 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     shipping_address = AddressSerializer(read_only=True)
     billing_address = AddressSerializer(read_only=True)
+    razorpay_order_id = serializers.SerializerMethodField()
+    razorpay_payment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -312,11 +374,25 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_method",
             "payment_status",
             "transaction_id",
+            "razorpay_order_id",
+            "razorpay_payment_id",
             "created_at",
             "updated_at",
             "items",
         ]
         read_only_fields = ["user", "created_at", "updated_at"]
+
+    def _get_tx(self, obj):
+        # One order should have at most one successful tx; fall back to latest.
+        return PaymentTransaction.objects.filter(order=obj).order_by("-created_at").first()
+
+    def get_razorpay_order_id(self, obj):
+        tx = self._get_tx(obj)
+        return tx.razorpay_order_id if tx else None
+
+    def get_razorpay_payment_id(self, obj):
+        tx = self._get_tx(obj)
+        return tx.razorpay_payment_id if tx else None
 
 
 
@@ -325,6 +401,13 @@ class OrderListSerializer(serializers.ModelSerializer):
     first_product_image = serializers.SerializerMethodField()
     first_product_title = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
+    items = OrderItemSerializer(many=True, read_only=True)
+    shipping_address = AddressSerializer(read_only=True)
+    billing_address = AddressSerializer(read_only=True)
+    payment_method = serializers.CharField(read_only=True)
+    transaction_id = serializers.CharField(read_only=True)
+    razorpay_order_id = serializers.SerializerMethodField()
+    razorpay_payment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -333,10 +416,18 @@ class OrderListSerializer(serializers.ModelSerializer):
             "total_amount",
             "status",
             "payment_status",
+            "payment_method",
+            "transaction_id",
+            "razorpay_order_id",
+            "razorpay_payment_id",
             "created_at",
+            "updated_at",
             "first_product_image",
             "first_product_title",
             "items_count",
+            "shipping_address",
+            "billing_address",
+            "items",
         ]
 
     def get_first_product_image(self, obj):
@@ -355,5 +446,16 @@ class OrderListSerializer(serializers.ModelSerializer):
 
     def get_items_count(self, obj):
         return obj.items.count()
+
+    def _get_tx(self, obj):
+        return PaymentTransaction.objects.filter(order=obj).order_by("-created_at").first()
+
+    def get_razorpay_order_id(self, obj):
+        tx = self._get_tx(obj)
+        return tx.razorpay_order_id if tx else None
+
+    def get_razorpay_payment_id(self, obj):
+        tx = self._get_tx(obj)
+        return tx.razorpay_payment_id if tx else None
 
 

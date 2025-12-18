@@ -1,27 +1,464 @@
 from django.contrib import admin
-from .models import BannerImage, Saloon, Cosmetics,FoodMenu,Courses,Category,Product,ProductVariant,Cart,CartItem,Address,Order,OrderItem,PaymentTransaction
+from django.db.models import DecimalField, ExpressionWrapper, F, Sum
+from django.contrib.auth.models import Group, User
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
+from django.utils.html import format_html
+
+from .models import (
+    # Basic site models
+    BannerImage,
+    Saloon,
+    FoodMenu,
+    Cosmetics,
+    Courses,
+    # E-commerce models
+    Category,
+    Product,
+    ProductVariant,
+    Cart,
+    CartItem,
+    Wishlist,
+    WishlistItem,
+    Address,
+    Order,
+    OrderItem,
+    PaymentTransaction,
+)
+
+
+# =============================================================
+# Helpers
+# =============================================================
+
+def _thumb(img_field, size=56):
+    if not img_field:
+        return "-"
+    return format_html(
+        '<img src="{}" style="width:{}px;height:{}px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;" />',
+        img_field.url,
+        size,
+        size,
+    )
+
+
+def _format_address(addr):
+    if not addr:
+        return "-"
+
+    parts = [
+        addr.label or None,
+        addr.line1,
+        addr.line2 or None,
+        f"{addr.city}{', ' + addr.state if addr.state else ''} - {addr.postal_code}",
+        addr.country,
+        f"Phone: {addr.phone}" if addr.phone else None,
+    ]
+    text = "\n".join([p for p in parts if p])
+    return format_html('<pre style="white-space:pre-wrap;margin:0">{}</pre>', text)
+
+
+# =============================================================
+# Basic (non e-commerce) admin (default /admin/)
+# =============================================================
+
+@admin.register(BannerImage)
+class BannerImageAdmin(admin.ModelAdmin):
+    list_display = ("id", "preview", "uploaded_at")
+    readonly_fields = ("preview", "uploaded_at")
+    search_fields = ("id",)
+    ordering = ("-uploaded_at",)
+
+    def preview(self, obj):
+        return _thumb(obj.image, size=64)
+
+    preview.short_description = "Image"
+
+
+@admin.register(Saloon)
+class SaloonAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "location", "preview")
+    search_fields = ("name", "location")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        return _thumb(obj.image, size=64)
+
+    preview.short_description = "Image"
+
+
+@admin.register(FoodMenu)
+class FoodMenuAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "price", "preview")
+    search_fields = ("title", "description")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        return _thumb(obj.image, size=56)
+
+    preview.short_description = "Image"
+
+
+@admin.register(Cosmetics)
+class CosmeticsAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "price", "preview")
+    search_fields = ("title", "description")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        return _thumb(obj.image, size=56)
+
+    preview.short_description = "Image"
+
+
+@admin.register(Courses)
+class CoursesAdmin(admin.ModelAdmin):
+    list_display = ("id", "course", "duration", "preview")
+    search_fields = ("course", "description", "duration")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        return _thumb(obj.image, size=56)
+
+    preview.short_description = "Image"
+
+
+# =============================================================
+# E-commerce admin site (separate panel: /ecommerce-admin/)
+# =============================================================
+
+class EcommerceAdminSite(admin.AdminSite):
+    site_header = "Jaji's — E‑Commerce Admin"
+    site_title = "Jaji's E‑Commerce Admin"
+    index_title = "E‑Commerce Dashboard"
+
+
+ecommerce_admin_site = EcommerceAdminSite(name="ecommerce_admin")
+ecommerce_admin_site.register(User, UserAdmin)
+ecommerce_admin_site.register(Group, GroupAdmin)
+
+
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 0
+    fields = ("quantity_label", "mrp", "price", "stock", "sku")
+    show_change_link = True
+
+
+@admin.register(Category, site=ecommerce_admin_site)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("id", "name")
+    search_fields = ("name",)
+    ordering = ("name",)
+
+
+@admin.register(Product, site=ecommerce_admin_site)
+class ProductAdmin(admin.ModelAdmin):
+    inlines = (ProductVariantInline,)
+
+    list_display = (
+        "id",
+        "preview",
+        "title",
+        "category",
+        "brand",
+        "variants_count",
+        "total_stock",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("category", "brand", "created_at")
+    search_fields = ("title", "description", "brand")
+    autocomplete_fields = ("category",)
+    readonly_fields = ("preview", "created_at", "updated_at")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+    fieldsets = (
+        ("Product", {"fields": ("title", "category", "brand", "description")}),
+        ("Images", {"fields": ("preview", "image1", "image2", "image3", "image4")}),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )
+
+    def preview(self, obj):
+        return _thumb(obj.image1, size=64)
+
+    preview.short_description = "Image"
+
+    def variants_count(self, obj):
+        return obj.variants.count()
+
+    variants_count.short_description = "Variants"
+
+    def total_stock(self, obj):
+        return sum(v.stock for v in obj.variants.all())
+
+    total_stock.short_description = "Total stock"
+
+
+@admin.register(ProductVariant, site=ecommerce_admin_site)
+class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ("id", "product_image", "product_title", "product", "quantity_label", "mrp", "price", "stock", "sku")
+    list_filter = ("product__category", "product__brand")
+    search_fields = ("sku", "product__title", "quantity_label")
+    ordering = ("product__title", "quantity_label")
+
+    def product_image(self, obj):
+        return _thumb(getattr(obj.product, "image1", None), size=44)
+
+    product_image.short_description = "Image"
+
+    def product_title(self, obj):
+        return getattr(obj.product, "title", "-")
+
+    product_title.short_description = "Product"
+
+
+# class CartItemInline(admin.TabularInline):
+#     model = CartItem
+#     extra = 0
+#     autocomplete_fields = ("variant",)
+#     fields = ("variant", "quantity", "line_total")
+#     readonly_fields = ("line_total",)
+
+#     def line_total(self, obj):
+#         try:
+#             return obj.total_price
+#         except Exception:
+#             return "-"
+
+#     line_total.short_description = "Total"
+
+
+# @admin.register(Cart, site=ecommerce_admin_site)
+# class CartAdmin(admin.ModelAdmin):
+#     inlines = (CartItemInline,)
+
+#     list_display = ("id", "user", "items_count", "cart_total", "created_at")
+#     search_fields = ("user__username", "user__email")
+#     autocomplete_fields = ("user",)
+#     readonly_fields = ("created_at",)
+#     ordering = ("-created_at",)
+
+#     def items_count(self, obj):
+#         return obj.items.count()
+
+#     items_count.short_description = "Items"
+
+#     def cart_total(self, obj):
+#         total_expr = ExpressionWrapper(
+#             F("quantity") * F("variant__price"),
+#             output_field=DecimalField(max_digits=12, decimal_places=2),
+#         )
+#         agg = obj.items.select_related("variant").aggregate(total=Sum(total_expr))
+#         return agg["total"] or 0
+
+#     cart_total.short_description = "Total"
+
+
+# @admin.register(CartItem, site=ecommerce_admin_site)
+# class CartItemAdmin(admin.ModelAdmin):
+#     list_display = ("id", "cart", "variant", "quantity", "line_total")
+#     search_fields = ("cart__user__username", "variant__product__title", "variant__sku")
+#     autocomplete_fields = ("cart", "variant")
+
+#     def line_total(self, obj):
+#         return obj.total_price
+
+#     line_total.short_description = "Total"
+
+
+class WishlistItemInline(admin.TabularInline):
+    model = WishlistItem
+    extra = 0
+    autocomplete_fields = ("variant",)
+    fields = ("variant",)
+
+
+# @admin.register(Wishlist, site=ecommerce_admin_site)
+# class WishlistAdmin(admin.ModelAdmin):
+#     inlines = (WishlistItemInline,)
+#     list_display = ("id", "user", "items_count", "created_at")
+#     search_fields = ("user__username", "user__email")
+#     autocomplete_fields = ("user",)
+#     readonly_fields = ("created_at",)
+#     ordering = ("-created_at",)
+
+#     def items_count(self, obj):
+#         return obj.wishlist_items.count()
+
+#     items_count.short_description = "Items"
+
+
+@admin.register(Address, site=ecommerce_admin_site)
+class AddressAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "label", "city", "state", "postal_code", "country", "phone", "is_default", "created_at")
+    list_filter = ("is_default", "country", "state", "city")
+    search_fields = ("user__username", "user__email", "label", "line1", "city", "postal_code", "phone")
+    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
+    actions = ("make_default",)
+
+    @admin.action(description="Set selected address as default (per user)")
+    def make_default(self, request, queryset):
+        # Ensure only one default per user
+        for addr in queryset.select_related("user"):
+            Address.objects.filter(user=addr.user, is_default=True).exclude(pk=addr.pk).update(is_default=False)
+            addr.is_default = True
+            addr.save(update_fields=["is_default"])
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    autocomplete_fields = ("variant",)
+    fields = ("product_image", "product_title", "variant", "quantity", "unit_price", "total_price")
+    readonly_fields = ("product_image", "product_title", "variant", "quantity", "unit_price", "total_price")
+    can_delete = False
+
+    def product_image(self, obj):
+        # Show the product's main image inside the Order admin (inline items)
+        return _thumb(getattr(obj.variant.product, "image1", None), size=44)
+
+    product_image.short_description = "Image"
+
+    def product_title(self, obj):
+        return getattr(obj.variant.product, "title", "-")
+
+    product_title.short_description = "Product"
+
+
+class PaymentTransactionInline(admin.TabularInline):
+    model = PaymentTransaction
+    extra = 0
+    fields = ("status", "amount", "razorpay_order_id", "razorpay_payment_id", "created_at")
+    readonly_fields = ("status", "amount", "razorpay_order_id", "razorpay_payment_id", "created_at")
+    can_delete = False
+
+
+@admin.register(Order, site=ecommerce_admin_site)
+class OrderAdmin(admin.ModelAdmin):
+    inlines = (OrderItemInline, PaymentTransactionInline)
+
+    list_display = (
+        "id",
+        "user",
+        "status",
+        "payment_status",
+        "total_amount",
+        "created_at",
+        "razorpay_payment_id",
+        "razorpay_order_id",
+        "shipping_address_short",
+    )
+
+    list_filter = ("status", "payment_status", "payment_method", "created_at")
+
+    search_fields = (
+        "id",
+        "user__username",
+        "user__email",
+        "transaction_id",
+        "items__variant__product__title",
+        "items__variant__sku",
+    )
+
+    autocomplete_fields = ("user", "shipping_address")
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "shipping_address_full",
+    )
+
+    ordering = ("-created_at",)
+
+    fieldsets = (
+        (
+            "Order",
+            {
+                "fields": (
+                    "user",
+                    "status",
+                    "total_amount",
+                    "shipping_cost",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+        (
+            "Payment",
+            {
+                "fields": (
+                    "payment_method",
+                    "payment_status",
+                    "transaction_id",
+                )
+            },
+        ),
+        (
+            "Shipping",
+            {
+                "fields": (
+                    # "shipping_address",
+                    "shipping_address_full",
+                )
+            },
+        ),
+    )
+
+    def shipping_address_full(self, obj):
+        return _format_address(obj.shipping_address)
+
+    shipping_address_full.short_description = "Shipping address (full)"
+
+    def shipping_address_short(self, obj):
+        a = obj.shipping_address
+        if not a:
+            return "-"
+        return f"{a.city} - {a.postal_code}"
+
+    shipping_address_short.short_description = "Shipping"
+
+    def razorpay_payment_id(self, obj):
+        tx = PaymentTransaction.objects.filter(order=obj).order_by("-created_at").first()
+        return tx.razorpay_payment_id if tx else "-"
+
+    razorpay_payment_id.short_description = "RZP Payment ID"
+
+    def razorpay_order_id(self, obj):
+        tx = PaymentTransaction.objects.filter(order=obj).order_by("-created_at").first()
+        return tx.razorpay_order_id if tx else "-"
+
+    razorpay_order_id.short_description = "RZP Order ID"
 
 
 
-admin.site.register(BannerImage)
-admin.site.register(Saloon)
-admin.site.register(Cosmetics)
-admin.site.register(FoodMenu)
-admin.site.register(Courses)
-
-# e commerse 
-admin.site.register(Category)
-admin.site.register(Product)
-admin.site.register(ProductVariant)
-admin.site.register(Cart)
-admin.site.register(CartItem)
 
 
-admin.site.register(Address)
-admin.site.register(Order)
-admin.site.register(OrderItem)
-admin.site.register(PaymentTransaction)
+# @admin.register(OrderItem, site=ecommerce_admin_site)
+# class OrderItemAdmin(admin.ModelAdmin):
+#     list_display = ("id", "product_image", "product_title", "order", "variant", "quantity", "unit_price", "total_price")
+#     search_fields = ("order__id", "variant__product__title", "variant__sku")
+#     autocomplete_fields = ("order", "variant")
+
+#     def product_image(self, obj):
+#         return _thumb(getattr(obj.variant.product, "image1", None), size=44)
+
+#     product_image.short_description = "Image"
+
+#     def product_title(self, obj):
+#         return getattr(obj.variant.product, "title", "-")
+
+#     product_title.short_description = "Product"
 
 
-
-
+# @admin.register(PaymentTransaction, site=ecommerce_admin_site)
+# class PaymentTransactionAdmin(admin.ModelAdmin):
+#     list_display = ("id", "user", "status", "amount", "razorpay_order_id", "razorpay_payment_id", "order", "created_at")
+#     list_filter = ("status", "created_at")
+#     search_fields = ("razorpay_order_id", "razorpay_payment_id", "user__username", "user__email", "order__id")
+#     autocomplete_fields = ("user", "order")
+#     readonly_fields = ("created_at",)

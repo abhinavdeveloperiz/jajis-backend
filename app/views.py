@@ -31,107 +31,174 @@ from django.shortcuts import get_object_or_404
 
 
 
-@api_view(['GET'])
-def home(request):
-    latest_image = BannerImage.objects.order_by('-uploaded_at').first()
-    serializer = BannerImageSerializer(latest_image, context={'request': request}) if latest_image else None
-    return Response({
-        "page": "Home",
-        "content": "This is the Home page.",
-        "video": serializer.data if serializer else None
-    })
+class home(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        latest_image = BannerImage.objects.order_by('-uploaded_at').first()
+        serializer = (
+            BannerImageSerializer(latest_image, context={'request': request})
+            if latest_image else None
+        )
+
+        return Response({
+            "page": "Home",
+            "content": "This is the Home page.",
+            "video": serializer.data if serializer else None
+        })
 
 
-@api_view(['GET'])
-def salons_view(request):
-    salon = Saloon.objects.all()
-    serializer = SaloonSerializer(salon, many=True, context={'request': request})
-    return Response({
-        "page": "Salons page",
-        "data": serializer.data
-    })
+# --------------------------------------------------
+# SALONS
+# --------------------------------------------------
+
+class salons_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        salon = Saloon.objects.all()
+        serializer = SaloonSerializer(salon, many=True, context={'request': request})
+
+        return Response({
+            "page": "Salons page",
+            "data": serializer.data
+        })
 
 
-@api_view(['GET'])
-def Food_menu_view(request):
-    food_items = FoodMenu.objects.all()
-    serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
-    return Response({
-        "page": "Food Menu",
-        "data": serializer.data
-    })
+class salons_detail_view(APIView):
+    permission_classes = [AllowAny]
 
-
-
-@api_view(['GET'])
-def salons_detail_view(request, id):
-    try:
-        salon = Saloon.objects.get(id=id)
+    def get(self, request, id):
+        salon = get_object_or_404(Saloon, id=id)
         serializer = SaloonSerializer(salon, context={'request': request})
+
         return Response({
             "page": "Salon Detail",
             "data": serializer.data
         })
-    except Saloon.DoesNotExist:
-        return Response({"error": "Salon not found"}, status=404)
-
-@api_view(['GET'])
-def cosmetics_view(request):
-    return Response({"page": "Cosmetics", "content": "This is the Cosmetics page."})
-
-@api_view(['GET'])
-def event_hall_view(request):
-    return Response({"page": "Event Hall", "content": "This is the Event Hall page."})
-
-@api_view(['GET'])
-def food_court_view(request):
-    food_items = FoodMenu.objects.all()
-    serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
-    return Response({
-        "page": "Food Menu",
-        "data": serializer.data
-    })
 
 
+# --------------------------------------------------
+# FOOD
+# --------------------------------------------------
+
+class Food_menu_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        food_items = FoodMenu.objects.all()
+        serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
+
+        return Response({
+            "page": "Food Menu",
+            "data": serializer.data
+        })
 
 
-@api_view(['GET'])
-def designing_view(request):
-    return Response({"page": "Designing & Stitching", "content": "This is the Designing & Stitching page."})
+class food_court_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        food_items = FoodMenu.objects.all()
+        serializer = FoodMenuSerializer(food_items, many=True, context={'request': request})
+
+        return Response({
+            "page": "Food Menu",
+            "data": serializer.data
+        })
 
 
+# --------------------------------------------------
+# STATIC PAGES
+# --------------------------------------------------
 
-@api_view(['GET'])
-def academy_view(request):
-    courses = Courses.objects.all()
-    course_serializer = CourseSerializer(courses, many=True, context={"request": request})
-    return Response({
-        "page": "course",
-        "data": course_serializer.data
-    })
+class cosmetics_view(APIView):
+    permission_classes = [AllowAny]
 
-
-
-@api_view(['GET'])
-def franchise_view(request):
-    return Response({"page": "Franchise", "content": "This is the Franchise page."})
-
-@api_view(['GET'])
-def about_us_view(request):
-    return Response({"page": "About Us", "content": "This is the About Us page."})
-
-@api_view(['GET'])
-def contact_view(request):
-    return Response({"page": "Contact", "content": "This is the Contact page."})
+    def get(self, request):
+        return Response({
+            "page": "Cosmetics",
+            "content": "This is the Cosmetics page."
+        })
 
 
-@api_view(['GET'])
-def Buy_productes_view(request):
-    return Response({"page": "Buy Products", "content": "This is the Buy Products page."})
+class event_hall_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "Event Hall",
+            "content": "This is the Event Hall page."
+        })
 
 
+class designing_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "Designing & Stitching",
+            "content": "This is the Designing & Stitching page."
+        })
 
 
+class franchise_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "Franchise",
+            "content": "This is the Franchise page."
+        })
+
+
+class about_us_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "About Us",
+            "content": "This is the About Us page."
+        })
+
+
+class contact_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "Contact",
+            "content": "This is the Contact page."
+        })
+
+
+class Buy_productes_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "page": "Buy Products",
+            "content": "This is the Buy Products page."
+        })
+
+
+# --------------------------------------------------
+# ACADEMY
+# --------------------------------------------------
+
+class academy_view(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        courses = Courses.objects.all()
+        course_serializer = CourseSerializer(
+            courses, many=True, context={"request": request}
+        )
+
+        return Response({
+            "page": "course",
+            "data": course_serializer.data
+        })
 
 
 
@@ -570,7 +637,7 @@ class VerifyPaymentView(APIView):
             shipping_address=shipping_address,
             billing_address=billing_address,
             total_amount=tx.amount,
-            status="processing",
+            status="confirmed",
             payment_method="razorpay",
             payment_status="paid",
             transaction_id=razorpay_payment_id,

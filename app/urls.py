@@ -2,17 +2,17 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.home),
-    path('salons/', views.salons_view),
-    path('salons/<int:id>/', views.salons_detail_view),
-    path('cosmetics/', views.cosmetics_view),
-    path('event-hall/', views.event_hall_view),
-    path('food-court/', views.food_court_view),
-    path('designing-stitching/', views.designing_view),
-    path('academy/', views.academy_view),
-    path('franchise/', views.franchise_view),
-    path('about-us/', views.about_us_view),
-    path('contact/', views.contact_view),
+    path('', views.home.as_view()),
+    path('salons/', views.salons_view.as_view()),
+    path('salons/<int:id>/', views.salons_detail_view.as_view()),
+    path('cosmetics/', views.cosmetics_view.as_view()),
+    path('event-hall/', views.event_hall_view.as_view()),
+    path('food-court/', views.food_court_view.as_view()),
+    path('designing-stitching/', views.designing_view.as_view()),
+    path('academy/', views.academy_view.as_view()),
+    path('franchise/', views.franchise_view.as_view()),
+    path('about-us/', views.about_us_view.as_view()),
+    path('contact/', views.contact_view.as_view()),
 
 
     # ecom-----------------
