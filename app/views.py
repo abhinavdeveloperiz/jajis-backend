@@ -1,7 +1,7 @@
 # views.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .models import BannerImage,Saloon,FoodMenu,Courses,Cart,CartItem,Category,Product,ProductVariant,Wishlist,WishlistItem
+from .models import BannerImage,Saloon,FoodMenu,Courses,Cart,CartItem,Category,Product,ProductVariant,Wishlist,WishlistItem,PasswordResetOTP
 from .serializers import BannerImageSerializer,SaloonSerializer,FoodMenuSerializer,CourseSerializer,CartItemSerializer,CartSerializer
 
 from rest_framework import permissions
@@ -17,6 +17,9 @@ from .serializers import (
     OrderItemSerializer,
     OrderListSerializer,
     OrderSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    UserProfileSerializer,
 )
 from .models import Category, Product, ProductVariant,WishlistItem,Wishlist,Order,OrderItem,PaymentTransaction,Address
 
@@ -27,6 +30,12 @@ from django.db import transaction
 from django.conf import settings
 import razorpay
 from django.shortcuts import get_object_or_404
+from .email import send_password_reset_otp_email
+from django.utils import timezone
+from datetime import timedelta
+import random
+import string
+from django.contrib.auth.models import User
 
 
 
@@ -248,27 +257,126 @@ class LogoutView(APIView):
         return Response({"message": "Logged out"}, status=200)
 
 
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({"message": "If the email exists, an OTP has been sent."}, status=200)
+            
+            # Generate OTP
+            otp = ''.join(random.choices(string.digits, k=6))
+            expires_at = timezone.now() + timedelta(minutes=10)
+            
+            # Save OTP
+            PasswordResetOTP.objects.create(email=email, otp=otp, expires_at=expires_at)
+            
+            # Send email
+            send_password_reset_otp_email(user, otp)
+            
+            return Response({"message": "OTP sent to your email."}, status=200)
+        return Response(serializer.errors, status=400)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            otp = serializer.validated_data['otp']
+            new_password = serializer.validated_data['new_password']
+            
+            try:
+                otp_obj = PasswordResetOTP.objects.get(email=email, otp=otp)
+            except PasswordResetOTP.DoesNotExist:
+                return Response({"message": "Invalid OTP."}, status=400)
+            
+            if otp_obj.is_expired():
+                otp_obj.delete()
+                return Response({"message": "OTP has expired."}, status=400)
+            
+            try:
+                user = User.objects.get(email=email)
+                user.set_password(new_password)
+                user.save()
+                otp_obj.delete()
+                return Response({"message": "Password reset successful."}, status=200)
+            except User.DoesNotExist:
+                return Response({"message": "User not found."}, status=400)
+        return Response(serializer.errors, status=400)
+
+
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+
 # -----------------------------------
 
 
 
+from django.db.models import Min, Q
+
 class ProductListAPIView(APIView):
-    permission_classes = [AllowAny]  # changed from IsAuthenticated
+    permission_classes = [AllowAny]
 
     def get(self, request):
         category_name = request.GET.get("category")
-        products = Product.objects.all()
-        if category_name and category_name.lower() != "all":
-            products = products.filter(category__name__icontains=category_name)
+        min_price = request.GET.get("min_price")
+        max_price = request.GET.get("max_price")
+        search = request.GET.get("search")
 
-        serializer = ProductListSerializer(products, many=True, context={'request': request})
+        products = Product.objects.all()
+
+        # 🔹 Category filter
+        if category_name and category_name.lower() != "all":
+            products = products.filter(category__name__iexact=category_name)
+
+        if search:
+            products = products.filter(title__icontains=search)
+
+        products = products.annotate(
+            lowest_price=Min("variants__price")
+        )
+
+        if min_price:
+            products = products.filter(lowest_price__gte=min_price)
+
+        if max_price:
+            products = products.filter(lowest_price__lte=max_price)
+
+        products = products.distinct().order_by("-created_at")
+
+        serializer = ProductListSerializer(
+            products,
+            many=True,
+            context={"request": request}
+        )
+
         categories = Category.objects.all()
         category_serializer = CategorySerializer(categories, many=True)
 
-        return Response({
-            "products": serializer.data,
-            "categories": category_serializer.data
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "products": serializer.data,
+                "categories": category_serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 
 
@@ -584,6 +692,8 @@ class CreatePaymentOrderView(APIView):
 
 
 
+from app.email import send_order_success_email
+
 
 class VerifyPaymentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -667,6 +777,10 @@ class VerifyPaymentView(APIView):
         tx.razorpay_signature = razorpay_signature
         tx.status = "success"
         tx.save()
+
+        # Send confirmation email to user and owner
+        order_items = OrderItem.objects.filter(order=order)
+        send_order_success_email(request.user, order, order_items)
 
         return Response({
             "message": "Payment verified successfully",

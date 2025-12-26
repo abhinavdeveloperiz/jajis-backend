@@ -10,6 +10,5 @@ urlpatterns = [
     path('', include('app.urls')),
 ]
 
-# In production, you should serve MEDIA via Nginx/Apache or object storage.
-# This fallback keeps uploaded images working even when DEBUG=False.
+
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

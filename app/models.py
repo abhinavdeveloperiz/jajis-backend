@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
 
 
 class BannerImage(models.Model):
@@ -116,7 +117,7 @@ class ProductVariant(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)    
 
     stock = models.PositiveIntegerField(default=0)
-    sku = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    sku = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return f"{self.product.title} - {self.quantity_label}"
@@ -175,14 +176,14 @@ class WishlistItem(models.Model):
 
 class Address(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
-    label = models.CharField(max_length=100, blank=True, null=True)  # e.g. Home, Work
+    label = models.CharField(max_length=100,)  # e.g. Home, Work
     line1 = models.CharField(max_length=255)
-    line2 = models.CharField(max_length=255, blank=True, null=True)
+    line2 = models.CharField(max_length=255)
     city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=20)
     country = models.CharField(max_length=100, default="India")
-    phone = models.CharField(max_length=30, blank=True, null=True)
+    phone = models.CharField(max_length=30)
     is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -250,3 +251,17 @@ class PaymentTransaction(models.Model):
     order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PasswordResetOTP(models.Model):
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    class Meta:
+        verbose_name = "Password Reset OTP"
+        verbose_name_plural = "Password Reset OTPs"

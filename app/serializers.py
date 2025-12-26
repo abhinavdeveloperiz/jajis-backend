@@ -3,7 +3,7 @@ from .models import (
     BannerImage, Cosmetics, Saloon, FoodMenu, Courses,
     Product, ProductVariant, Category, Cart, CartItem,
     Wishlist, WishlistItem, Address, Order, OrderItem,
-    PaymentTransaction,
+    PaymentTransaction, PasswordResetOTP,
     
 )
 from django.contrib.auth.models import User
@@ -132,9 +132,39 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True)
+
+
+
+ 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "date_joined",
+        ]
+        read_only_fields = ["id", "email", "date_joined"]
+
+
+
 # --------------------------------------------------------------
 # PRODUCT / VARIANT / CATEGORY
 # --------------------------------------------------------------
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
