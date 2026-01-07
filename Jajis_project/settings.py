@@ -13,13 +13,17 @@ SECRET_KEY = 'django-insecure-v9t#=pguwv4v++8b!$iz5894-id@p_$i9fmj9%_(r$wk-_g5oe
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'jajis-frondend.onrender.com',
-    'www.jajis-frondend.onrender.com',
     'inspirezesttechnologiesprojectdemo.space', 
     'www.inspirezesttechnologiesprojectdemo.space',
+    "jajis.up.railway.app",
     '127.0.0.1', 
     'localhost',  
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://jajis.up.railway.app",
+]
+
 
 
 # Application definition
@@ -141,11 +145,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 
-import os
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 STATIC_URL = '/static/'
 
 STATIC_ROOT = BASE_DIR / "staticfiles"  
@@ -168,13 +167,14 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CORS_ALLOW_ALL_ORIGINS = True
+
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://jajis-frondend.onrender.com",
-    "https://inspirezesttechnologiesprojectdemo.space",
+    "https://jajis.onrender.com",
 ]
+
+
 
 
 

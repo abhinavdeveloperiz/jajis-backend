@@ -7,7 +7,7 @@ from app.admin import ecommerce_admin_site
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('ecommerce/admin/', ecommerce_admin_site.urls),
-    path('', include('app.urls')),
+    path('api/', include('app.urls')),
 ]
 
 
