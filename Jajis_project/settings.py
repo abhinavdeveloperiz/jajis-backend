@@ -31,7 +31,7 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://jajis.onrender.com",
-    "https://jajis.vercel.app/",
+    "https://jajis.vercel.app",
 ]
 
 
